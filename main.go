@@ -1,93 +1,80 @@
 package main
 
 import (
-	"encoding/json"
-	"log"
-	"net/http"
+	"fmt"
+	"os"
+	"strconv"
 )
 
-// User adalah "bentuk data" yang akan kita kirim/terima lewat API
-type User struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-// users = "database sementara" (disimpan di memory, hilang kalau server mati)
-var users = []User{
-	{ID: 1, Name: "Abdi"},
-	{ID: 2, Name: "Budi"},
-}
-
-// usersHandler menangani route "/users" untuk method GET dan POST
-func usersHandler(w http.ResponseWriter, r *http.Request) {
-	// Header ini memberi tahu client bahwa response kita JSON
-	w.Header().Set("Content-Type", "application/json")
-
-	// Kita bedakan behavior berdasarkan HTTP method
-	switch r.Method {
-	case http.MethodGet:
-		// GET /users -> balikin seluruh list users
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(users)
-
-	case http.MethodPost:
-		// POST /users -> baca body JSON, lalu tambahkan ke slice
-
-		// 1) Decode JSON dari body request ke struct User
-		var payload User
-		err := json.NewDecoder(r.Body).Decode(&payload)
-		if err != nil {
-			// Kalau body bukan JSON yang valid
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error": "invalid JSON body",
-			})
-			return
-		}
-
-		// 2) Validasi sederhana: Name tidak boleh kosong
-		if payload.Name == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error": "name is required",
-			})
-			return
-		}
-
-		// 3) Buat ID baru (cara paling sederhana untuk pemula)
-		newID := 1
-		if len(users) > 0 {
-			newID = users[len(users)-1].ID + 1
-		}
-
-		// 4) Buat user baru, lalu simpan
-		newUser := User{ID: newID, Name: payload.Name}
-		users = append(users, newUser)
-
-		// 5) Balikin user yang baru dibuat
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode("Berhasil")
-
-	default:
-		// Kalau method bukan GET/POST -> 405 Method Not Allowed
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "method not allowed",
-		})
-	}
-}
+const AppName = "Customer Manager CLI (Phase 1)"
+const DefaultLimit = 10
 
 func main() {
-	// Route: kalau ada request ke /users, panggil usersHandler
-	http.HandleFunc("/users", usersHandler)
+	fmt.Println(AppName)
 
-	// Info di terminal biar kamu tahu server sudah hidup
-	log.Println("Server running on http://localhost:8080")
+	// ====== Variables & Zero Values ======
+	var page int // 0
+	var limit int = DefaultLimit
+	var search string // ""
+	var active bool   // false
 
-	// Nyalakan server di port 8080
-	// Kalau error (misal port kepakai), program akan berhenti dan log error
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
+	fmt.Println("Default values:")
+	fmt.Println("page =", page, "| limit =", limit, "| search =", search, "| active =", active)
+
+	// ====== Args handling ======
+	// contoh pemakaian:
+	// go run ./cmd/app list-customers 2 5
+	// artinya: command=list-customers, page=2, limit=5
+	if len(os.Args) < 2 {
+		fmt.Println("No command provided.")
+		fmt.Println("Example: go run ./cmd/app list-customers 2 5")
+		return
+	}
+
+	command := os.Args[1]
+
+	// parse optional args
+	// os.Args[2] = page, os.Args[3] = limit
+	if len(os.Args) >= 3 {
+		p, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			fmt.Println("Invalid page. Must be integer.")
+			return
+		}
+		page = p
+	}
+
+	if len(os.Args) >= 4 {
+		l, err := strconv.Atoi(os.Args[3])
+		if err != nil {
+			fmt.Println("Invalid limit. Must be integer.")
+			return
+		}
+		limit = l
+	}
+
+	// boolean demo (aktifkan kalau ada arg "active")
+	// go run ./cmd/app list-customers 1 10 active
+	if len(os.Args) >= 5 && os.Args[4] == "active" {
+		active = true
+	}
+
+	// string demo (search)
+	// go run ./cmd/app list-customers 1 10 active andi
+	if len(os.Args) >= 6 {
+		search = os.Args[5]
+	}
+
+	fmt.Println("\nArgs:", os.Args)
+	fmt.Println("\nParsed Input:")
+	fmt.Printf("command=%s page=%d limit=%d active=%t search=%q\n", command, page, limit, active, search)
+
+	// ====== Type conversion demo ======
+	// (page, limit) -> offset = (page-1)*limit
+	if page > 0 {
+		offset := (page - 1) * limit
+		fmt.Println("offset =", offset)
+	} else {
+		fmt.Println("offset not computed (page must be > 0)")
 	}
 }
