@@ -1,0 +1,10 @@
+basePath: /
+info:
+  contact: {}
+  description: Simple REST API for managing customers.
+  title: Customer Manager API
+  version: 0.1.0
+paths: {}
+schemes:
+- http
+swagger: "2.0"
